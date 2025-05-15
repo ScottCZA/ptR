@@ -1,0 +1,103 @@
+---
+title: "7_boxplot"
+author: "Zhuan_Chen&Yukai_Liu"
+date: "2025-05-14"
+output: html_document
+---
+# loading library
+```{r}
+library(tidyverse)
+library(grid)
+library(reshape2)
+library(gghalves)
+library(umap)
+```
+
+# load data
+```{r}
+t_melt <- read.table("./diff_table.tsv", sep = "\t", header = T)
+```
+
+
+```{r}
+cza_boxplot <- function(data,value = "d0_log10FC",thread = Inf){
+    data <- data %>% filter(!!sym(value) < thread)
+    p <- ggplot(data,aes(x = replication, y = !!sym(value),colour = variable)) +
+      geom_half_boxplot(side = "l") +
+      geom_half_violin(side = "r") +
+      facet_wrap(~ES, ncol = 5) +
+      coord_fixed(1) +
+      coord_flip() +
+      theme(legend.position = "none")
+  return(p)
+}
+
+```
+
+
+```{r}
+p_list <- list(
+  cza_boxplot(t_melt,"d0_log10FC", 4),
+  cza_boxplot(t_melt,"d6_log10FC", 4),
+  cza_boxplot(t_melt,"d12_log10FC", 4)
+)
+
+boxplot <- gridExtra::grid.arrange(grobs = p_list, nrow = 3, ncol = 1, gp = gpar(fontsize = 28, font = 2))
+```
+
+```{r}
+ggsave("boxplot.png",plot = boxplot, width = 2400,height = 1200, dpi = 180,units = "px",limitsize = FALSE)
+```
+
+
+```{r}
+m.zac_plot <- function(data,value,thread=Inf){
+  data <- data %>% filter(!!sym(value) < thread)
+  p <- ggplot(data,aes(x = m.z, y = !!sym(value),colour = variable)) +
+  geom_point() +
+  theme(legend.position = "none") 
+  return(p)
+}
+```
+
+
+```{r}
+p_list <- list(
+  m.zac_plot(t_melt,"d0_log10FC",4),
+  m.zac_plot(t_melt,"d6_log10FC",4),
+  m.zac_plot(t_melt,"d12_log10FC",4)
+)
+
+gridExtra::grid.arrange(grobs = p_list, nrow = 1, ncol = 3, gp = gpar(fontsize = 28, font = 2))
+```
+
+
+```{r}
+#c("d0_value","d6_value","d12_value")
+
+umap_fit <- t_melt[c("d0_log10FC","d6_log10FC","d12_log10FC")] %>%
+  scale() %>% 
+  umap()
+
+umap_df <- umap_fit$layout %>%
+  as.data.frame()%>%
+  rename(UMAP1="V1",
+         UMAP2="V2") %>%
+  mutate(ES = t_melt$ES, m.z = t_melt$m.z)
+
+umap_df %>% head()
+```
+
+
+```{r}
+umap_df %>%
+  ggplot(aes(x = UMAP1, 
+             y = UMAP2,
+             colour = ES)
+         )+
+  geom_point()+
+  labs(x = "UMAP1",
+       y = "UMAP2",
+       subtitle = "UMAP plot")
+```
+

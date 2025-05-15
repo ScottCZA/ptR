@@ -1,0 +1,194 @@
+---
+title: "5_melt_data"
+output: html_document
+---
+#### loading library
+```{r}
+library(tidyverse)
+library(grid)
+library(reshape2)
+library(gghalves)
+library(Biobase)
+library(limma)
+```
+
+##### read signal matrix
+```{r}
+day0 <- read.table("Day0.csv",sep = ",",header = T)
+day6 <- read.table("Day6.csv",sep = ",",header = T)
+day12 <- read.table("Day12.csv",sep = ",",header = T)
+```
+
+# convert to long_from
+```{r}
+d0_melt <- melt(day0)
+d6_melt <- melt(day6)
+d12_melt <- melt(day12)
+
+t_melt <- data.frame(
+  m.z = d0_melt$m.z, 
+  variable = d0_melt$variable, 
+  d0_value = d0_melt$value, 
+  d6_value = d6_melt$value, 
+  d12_value = d12_melt$value
+  )
+```
+
+#### separate replication note
+#### and join to t_melt as a condition
+#### remove chemical prediction of m.z
+```{r}
+ES <- t_melt$variable %>% gsub(pattern = "_.*", replacement = "")
+replication <- t_melt$variable %>% gsub(pattern = ".*_", replacement = "")
+m.z <- t_melt$m.z %>% gsub(pattern = "\\(.*\\)", replacement = "") %>% gsub(pattern = "m", replacement = "") %>% as.double()
+
+t_melt$ES <- ES
+t_melt$replication <- replication
+t_melt$m.z <- m.z
+```
+
+
+#### log10 convert
+```{r}
+t_melt$d0_log10value <- (t_melt$d0_value +1) %>% log10()
+t_melt$d6_log10value <- (t_melt$d6_value +1) %>% log10()
+t_melt$d12_log10value <- (t_melt$d12_value +1) %>% log10()
+```
+
+
+```{r}
+ggplot(t_melt,aes(x = m.z, y = d0_value, colour = variable)) +
+  geom_point() +
+  theme_bw()+
+  theme(legend.position = "none") 
+```
+
+
+#### save 
+```{r}
+# write.table(t_melt,file = "./t_melt.tsv", sep = "\t",row.names = F)
+```
+
+#-------------------------------------------------------------------
+# median of ES_0 as the background, use log10(x) - log10(background) as a difference expression table
+```{r}
+day0 %>% head()
+```
+
+
+```{r}
+# lapply(x,FUN):
+#             x is a list
+# rowMedians(x):
+#             x is a matrix
+control_median <- lapply(list(day0,day6,day12), function(x){
+  es_0 <- x[,2:4] %>% as.matrix()
+  median <- rowMedians(es_0)
+  return(median)
+})
+
+control_median
+```
+
+
+```{r}
+ES_0_median <- data.frame(
+  row.names = day0$m.z,
+  day0_C = control_median[[1]],
+  day6_C = control_median[[2]],
+  day12_C = control_median[[3]]
+)
+
+ES_0_median
+```
+
+
+```{r}
+day0_subC <- day0 %>% 
+  mutate(C = ES_0_median$day0_C)
+day6_subC <- day6 %>% 
+  mutate(C = ES_0_median$day6_C)
+day12_subC <- day12 %>% 
+  mutate(C = ES_0_median$day12_C)
+```
+
+
+```{r}
+# log10FC transformation
+for (i in 2:ncol(day0_subC)){
+  day0_subC[,i] <- log10(day0_subC[,i]/day0_subC$C)
+  day6_subC[,i] <- log10(day6_subC[,i]/day6_subC$C)
+  day12_subC[,i] <- log10(day12_subC[,i]/day12_subC$C)
+}
+```
+
+
+```{r}
+d0_subC_melt <- melt(day0_subC)
+d6_subC_melt <- melt(day6_subC)
+d12_subC_melt <- melt(day12_subC)
+
+diff_melt <- data.frame(
+  m.z = d0_subC_melt$m.z, 
+  variable = d0_subC_melt$variable, 
+  d0_log10FC = d0_subC_melt$value, 
+  d6_log10FC = d6_subC_melt$value, 
+  d12_log10FC = d12_subC_melt$value
+  )
+
+# remove  all control
+diff_melt <- diff_melt[which(diff_melt$variable != "C"),]
+```
+
+```{r}
+ES <- diff_melt$variable %>% gsub(pattern = "_.*", replacement = "")
+replication <- diff_melt$variable %>% gsub(pattern = ".*_", replacement = "")
+m.z <- diff_melt$m.z %>% gsub(pattern = "\\(.*\\)", replacement = "") %>% gsub(pattern = "m", replacement = "") %>% as.double()
+
+diff_melt$ES <- ES
+diff_melt$replication <- replication
+diff_melt$m.z <- m.z
+```
+
+#save diff_table
+```{r}
+write.table(diff_melt,file = "./diff_table.tsv", sep = "\t",row.names = F)
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+

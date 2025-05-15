@@ -1,0 +1,134 @@
+---
+title: "6_barplot"
+output: html_document
+---
+# loading library
+```{r}
+library(tidyverse)
+library(grid)
+library(cowplot)
+```
+
+
+```{r}
+t_melt <- read.table("./diff_table.tsv", sep = "\t", header = T)
+```
+
+
+```{r}
+t_melt_filter <- t_melt #%>% filter(d0_log10value < 2)
+```
+
+# add sign of log10FC
+```{r}
+t_melt_filter <- t_melt_filter %>%
+  mutate(
+    d0_sign = ifelse(sign(d0_log10FC)==1,"positive","negetive"),
+    d6_sign = ifelse(sign(d6_log10FC)==1,"positive","negetive"),
+    d12_sign = ifelse(sign(d12_log10FC)==1,"positive","negetive"),
+    ) 
+```
+
+
+# relative Abundance 
+```{r}
+sign_FC <- c("d0","d6","d12")
+for (i in sign_FC){
+  sign_d <- paste0(i,"_sign")
+  abu_d <- paste0("abu_",i)
+  FC <- paste0(i,"_log10FC")
+  
+  t_melt_filter <- t_melt_filter %>%
+    group_by(variable,!!sym(sign_d)) %>%
+    mutate(
+      !!sym(abu_d) := !!sym(FC)/sum(!!sym(FC))*100
+      )
+}
+
+
+```
+
+
+```{r}
+cza_bar <- function(data,day,legend = F, y_lab = T){
+    abu_day <- str_glue("abu_d{day}")
+    d_value <- str_glue("d{day}_value")
+    log10_v <- str_glue("d{day}_log10FC")
+    sign_d <- str_glue("d{day}_sign")
+    
+    p <- ggplot(data,aes(x = replication,y = !!sym(log10_v), fill = m.z)) +
+    geom_bar(stat = "identity", position = "stack") +
+    ylab("") +
+    facet_wrap(c(sign_d,"ES"), ncol = 5)+
+    labs(title = str_glue("day{day}"))+ 
+    theme(
+      legend.position = "none",
+      axis.text.x = element_text(size = 6)
+      ) +
+    scale_fill_binned(type = "viridis") 
+    
+    if(legend){
+      legend_p <- get_legend(p + theme(legend.position = "right"))
+      return(legend_p)
+    }
+    
+    if(y_lab){
+      p <- p + ylab("FC_Abundance%")
+      return(p)
+    }
+    
+    return(p)
+  
+}
+```
+
+
+```{r}
+data_t = t_melt_filter %>%group_by(ES)  %>% arrange(m.z)
+p_list <- list(
+  cza_bar(data_t,0),
+  cza_bar(data_t,6,y_lab = F),
+  cza_bar(data_t,12,y_lab = F),
+  cza_bar(data_t,12,T)
+)
+bar_plot <- gridExtra::grid.arrange(grobs = p_list, nrow = 1, ncol = 4, gp = gpar(fontsize = 10, font = 2))
+```
+```{r}
+ggsave("barplot_abs.png",plot = bar_plot, width = 2400,height = 1200, dpi = 180,units = "px",limitsize = FALSE)
+```
+
+
+```{r}
+cza_bar(data_t,12)
+```
+
+
+```{r}
+day = "6"
+    abu_day <- str_glue("abu_d{day}")
+    d_value <- str_glue("d{day}_value")
+    log10_v <- str_glue("d{day}_log10FC")
+    sign_d <- str_glue("d{day}_sign")
+
+ggplot(data_t,aes(x = replication,y = !!sym(abu_day), fill = m.z)) +
+    geom_bar(stat = "identity", position = "stack") +
+    ylab("") +
+    # ylim(-75,60)+
+    facet_wrap(c(sign_d,"ES"), ncol = 5)+
+    # facet_wrap(c("ES"), ncol = 5)+
+    labs(title = str_glue("day{day}"))+ 
+    scale_fill_binned(type = "viridis")
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
